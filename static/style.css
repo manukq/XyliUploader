@@ -27,6 +27,75 @@ body {
     padding: 30px 0;
 }
 
+.auth-section {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.auth-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.auth-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    color: #fff;
+    transition: opacity 0.2s;
+}
+
+.auth-btn:hover {
+    opacity: 0.85;
+}
+
+.auth-btn.discord {
+    background: #5865F2;
+}
+
+.auth-btn.twitch {
+    background: #9146FF;
+}
+
+.auth-btn.github {
+    background: #24292e;
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.username {
+    font-size: 14px;
+    font-weight: 600;
+    color: #e0e0e0;
+}
+
+.logout-btn {
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    color: #ff4444;
+    border: 1px solid #ff4444;
+    transition: all 0.2s;
+}
+
+.logout-btn:hover {
+    background: #ff4444;
+    color: #fff;
+}
+
 .logo {
     width: 64px;
     height: 64px;

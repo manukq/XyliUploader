@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/base64"
@@ -34,6 +35,20 @@ type Config struct {
 		MaxSize int64  `json:"maxSize"`
 		BaseURL string `json:"baseURL"`
 	} `json:"upload"`
+	OAuth struct {
+		Discord struct {
+			ClientID     string `json:"clientID"`
+			ClientSecret string `json:"clientSecret"`
+		} `json:"discord"`
+		Twitch struct {
+			ClientID     string `json:"clientID"`
+			ClientSecret string `json:"clientSecret"`
+		} `json:"twitch"`
+		GitHub struct {
+			ClientID     string `json:"clientID"`
+			ClientSecret string `json:"clientSecret"`
+		} `json:"github"`
+	} `json:"oauth"`
 }
 
 var (
@@ -89,6 +104,30 @@ func generateID() string {
 	return base64.RawURLEncoding.EncodeToString(b)[:5]
 }
 
+func getStorageUsed(ownerID string) (int64, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	cursor, err := gfsBucket.Find(bson.M{"metadata.owner_id": ownerID})
+	if err != nil {
+		return 0, err
+	}
+	defer cursor.Close(ctx)
+
+	var total int64
+	for cursor.Next(ctx) {
+		var doc struct {
+			Length int64 `bson:"length"`
+		}
+		if err := cursor.Decode(&doc); err != nil {
+			return 0, err
+		}
+		total += doc.Length
+	}
+
+	return total, nil
+}
+
 func getFileType(contentType string) string {
 	if strings.HasPrefix(contentType, "image/") {
 		return "image"
@@ -128,6 +167,22 @@ func main() {
 
 	http.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "static/favicon.ico")
+	})
+
+	http.HandleFunc("/auth/login/", handleOAuthLogin)
+	http.HandleFunc("/auth/callback/", handleOAuthCallback)
+	http.HandleFunc("/auth/logout", handleLogout)
+	http.HandleFunc("/auth/me", func(w http.ResponseWriter, r *http.Request) {
+		user, ok := getSessionUser(r)
+		if !ok {
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Not authenticated"})
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]string{
+			"username": user["username"].(string),
+			"provider": user["provider"].(string),
+		})
 	})
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -260,7 +315,15 @@ func main() {
 		}
 		defer downloadStream.Close()
 
-		w.Header().Set("Content-Type", fileDoc.Metadata.ContentType)
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Content-Security-Policy", "default-src 'none'; sandbox")
+
+		ct := fileDoc.Metadata.ContentType
+		if ct == "text/html" || ct == "image/svg+xml" {
+			ct = "application/octet-stream"
+		}
+
+		w.Header().Set("Content-Type", ct)
 		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", fileDoc.Filename))
 		io.Copy(w, downloadStream)
 	})
@@ -271,11 +334,21 @@ func main() {
 			return
 		}
 
+		if !rateLimit(uploadLimiter, w, r) {
+			return
+		}
+
 		if !requireCSRF(w, r) {
 			return
 		}
 
-		err := r.ParseMultipartForm(config.Upload.MaxSize)
+		var maxFileSize int64 = 300 * 1024 * 1024
+		if user, ok := getSessionUser(r); ok {
+			maxFileSize = 1024 * 1024 * 1024
+			_ = user
+		}
+
+		err := r.ParseMultipartForm(maxFileSize)
 		if err != nil {
 			jsonError(w, "Bad request", http.StatusBadRequest)
 			return
@@ -288,22 +361,51 @@ func main() {
 		}
 		defer file.Close()
 
-		if header.Size > config.Upload.MaxSize {
-			jsonError(w, fmt.Sprintf("File too large (max %d MB)", config.Upload.MaxSize/(1024*1024)), http.StatusBadRequest)
+		if header.Size > maxFileSize {
+			jsonError(w, fmt.Sprintf("File too large (max %d MB)", maxFileSize/(1024*1024)), http.StatusBadRequest)
 			return
+		}
+
+		if isBlockedExtension(header.Filename) {
+			jsonError(w, "File type not allowed", http.StatusBadRequest)
+			return
+		}
+
+		head := make([]byte, 512)
+		n, _ := file.Read(head)
+		detectedCT := http.DetectContentType(head[:n])
+
+		if isExecutableType(detectedCT) {
+			jsonError(w, "Executable files are not allowed", http.StatusBadRequest)
+			return
+		}
+
+		detectedCT = safeContentType(detectedCT, header.Filename)
+
+		var ownerID string
+		if user, ok := getSessionUser(r); ok {
+			ownerID = user["_id"].(string)
+
+			usedQuota, err := getStorageUsed(ownerID)
+			if err != nil {
+				jsonError(w, "Quota check error", http.StatusInternalServerError)
+				return
+			}
+
+			if usedQuota+header.Size > 20*1024*1024*1024 {
+				jsonError(w, "Storage quota exceeded", http.StatusBadRequest)
+				return
+			}
 		}
 
 		shortID := generateID()
 		deleteToken := generateID() + generateID()
-		contentType := header.Header.Get("Content-Type")
-		if contentType == "" {
-			contentType = "application/octet-stream"
-		}
 
 		opts := options.GridFSUpload().SetMetadata(bson.M{
 			"short_id":     shortID,
 			"delete_token": deleteToken,
-			"content_type": contentType,
+			"content_type": detectedCT,
+			"owner_id":     ownerID,
 		})
 
 		uploadStream, err := gfsBucket.OpenUploadStream(header.Filename, opts)
@@ -313,7 +415,8 @@ func main() {
 		}
 		defer uploadStream.Close()
 
-		_, err = io.Copy(uploadStream, file)
+		fileReader := io.MultiReader(bytes.NewReader(head[:n]), file)
+		_, err = io.Copy(uploadStream, fileReader)
 		if err != nil {
 			jsonError(w, "Write error", http.StatusInternalServerError)
 			return
@@ -331,6 +434,10 @@ func main() {
 	http.HandleFunc("/delete/", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			jsonError(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		if !rateLimit(deleteLimiter, w, r) {
 			return
 		}
 
@@ -355,7 +462,10 @@ func main() {
 		defer cursor.Close(ctx)
 
 		var fileDoc struct {
-			ID interface{} `bson:"_id"`
+			ID       interface{} `bson:"_id"`
+			Metadata struct {
+				OwnerID string `bson:"owner_id"`
+			} `bson:"metadata"`
 		}
 
 		if !cursor.Next(ctx) {
@@ -367,6 +477,14 @@ func main() {
 		if err != nil {
 			jsonError(w, "Decode error", http.StatusInternalServerError)
 			return
+		}
+
+		if fileDoc.Metadata.OwnerID != "" {
+			user, ok := getSessionUser(r)
+			if !ok || user["_id"].(string) != fileDoc.Metadata.OwnerID {
+				jsonError(w, "Not authorized to delete this file", http.StatusForbidden)
+				return
+			}
 		}
 
 		err = gfsBucket.Delete(fileDoc.ID)

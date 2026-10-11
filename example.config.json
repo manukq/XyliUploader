@@ -10,5 +10,19 @@
   "upload": {
     "maxSize": 314572800,
     "baseURL": "https://example.com"
+  },
+  "oauth": {
+    "discord": {
+      "clientID": "...",
+      "clientSecret": "..."
+    },
+    "twitch": {
+      "clientID": "...",
+      "clientSecret": "..."
+    },
+    "github": {
+      "clientID": "...",
+      "clientSecret": "..."
+    }
   }
 }

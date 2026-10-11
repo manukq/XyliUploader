@@ -20,6 +20,23 @@ function csrfHeaders() {
     return headers;
 }
 
+async function checkAuth() {
+    try {
+        const response = await fetch('/auth/me');
+        if (response.ok) {
+            const data = await response.json();
+            document.getElementById('authButtons').style.display = 'none';
+            document.getElementById('userInfo').style.display = 'flex';
+            document.getElementById('username').textContent = data.username;
+        } else {
+            document.getElementById('authButtons').style.display = 'flex';
+            document.getElementById('userInfo').style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Auth check failed:', error);
+    }
+}
+
 dropZone.addEventListener('click', () => fileInput.click());
 
 dropZone.addEventListener('dragover', (e) => {
@@ -237,3 +254,4 @@ function showToast(message) {
 }
 
 loadHistory();
+checkAuth();

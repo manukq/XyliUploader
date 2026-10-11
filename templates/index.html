@@ -13,6 +13,17 @@
         <header class="header">
             <img src="/static/favicon.ico" alt="logo" class="logo">
             <h1 class="title">XyliUploader</h1>
+            <div class="auth-section" id="authSection">
+                <div class="auth-buttons" id="authButtons">
+                    <a href="/auth/login/discord" class="auth-btn discord">Discord</a>
+                    <a href="/auth/login/twitch" class="auth-btn twitch">Twitch</a>
+                    <a href="/auth/login/github" class="auth-btn github">GitHub</a>
+                </div>
+                <div class="user-info" id="userInfo" style="display: none;">
+                    <span class="username" id="username"></span>
+                    <a href="/auth/logout" class="logout-btn">Выйти</a>
+                </div>
+            </div>
         </header>
 
         <div class="upload-section">
