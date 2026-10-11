@@ -14,11 +14,12 @@
             <img src="/static/favicon.ico" alt="logo" class="logo">
             <h1 class="title">XyliUploader</h1>
             <div class="auth-section" id="authSection">
-                <div class="auth-buttons" id="authButtons">
-                    <a href="/auth/login/discord" class="auth-btn discord">Discord</a>
-                    <a href="/auth/login/twitch" class="auth-btn twitch">Twitch</a>
-                    <a href="/auth/login/github" class="auth-btn github">GitHub</a>
-                </div>
+                <a href="/login" class="login-btn" id="loginBtn">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/>
+                    </svg>
+                    Login
+                </a>
                 <div class="user-info" id="userInfo" style="display: none;">
                     <span class="username" id="username"></span>
                     <a href="/auth/logout" class="logout-btn">Выйти</a>
@@ -33,7 +34,7 @@
                 </svg>
                 <p class="drop-text">Перетащите или выберите файл</p>
                 <p class="drop-limit">Максимум 300 MB</p>
-                <input type="file" id="fileInput" hidden>
+                <input type="file" id="fileInput" multiple hidden>
             </div>
             <button class="upload-btn" id="uploadBtn">Загрузить</button>
 
@@ -46,7 +47,14 @@
         </div>
 
         <div class="history-section" id="historySection">
-            <h2 class="history-title">Загруженные файлы</h2>
+            <div class="history-header">
+                <h2 class="history-title">Загруженные файлы</h2>
+                <div class="history-actions">
+                    <button class="album-btn" id="albumBtn" onclick="createAlbum()">Создать альбом</button>
+                    <button class="album-btn" onclick="copyAllLinks()">Копировать все ссылки</button>
+                    <button class="album-btn delete-all" onclick="deleteAllFiles()">Удалить все</button>
+                </div>
+            </div>
             <div class="table-container">
                 <table class="history-table">
                     <thead>

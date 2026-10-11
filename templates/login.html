@@ -5,104 +5,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" href="/static/favicon.ico">
     <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/integrations.css">
-    <title>Welcome!</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <title>Login - XyliUploader</title>
 </head>
 <body>
     <div class="container">
         <header class="header">
-            <a href="/" class="back-link">← Назад</a>
-            <h1 class="title">Интеграция с сервисами</h1>
+            <a href="/" class="back-link">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+                Назад
+            </a>
+            <h1 class="title">Вход</h1>
         </header>
 
-        <div class="integration-section">
-            <h2 class="section-title">ShareX</h2>
-            <button class="download-config-btn" id="downloadShareX">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
-                </svg>
-                Скачать конфиг ShareX
-            </button>
+        <div class="login-section">
+            <a href="/auth/login/discord" class="oauth-btn discord">
+                <img src="https://cdn.simpleicons.org/discord/5865F2" alt="Discord" class="oauth-icon">
+                <span>Discord</span>
+            </a>
+            <a href="/auth/login/twitch" class="oauth-btn twitch">
+                <img src="https://cdn.simpleicons.org/twitch/9146FF" alt="Twitch" class="oauth-icon">
+                <span>Twitch</span>
+            </a>
+            <a href="/auth/login/github" class="oauth-btn github">
+                <img src="https://cdn.simpleicons.org/github/181717" alt="GitHub" class="oauth-icon">
+                <span>GitHub</span>
+            </a>
         </div>
-
-        <div class="integration-section">
-            <h2 class="section-title">DankChat / Chatterino</h2>
-
-            <div class="config-group">
-                <label class="config-label">Request URL</label>
-                <div class="input-group">
-                    <input type="text" class="config-input" value="https://img.xyli.eu/upload" readonly>
-                    <button class="copy-btn" onclick="copyToClipboard('https://img.xyli.eu/upload')">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                        </svg>
-                    </button>
-                </div>
-            </div>
-
-            <div class="config-group">
-                <label class="config-label">Form field</label>
-                <div class="input-group">
-                    <input type="text" class="config-input" value="file" readonly>
-                    <button class="copy-btn" onclick="copyToClipboard('file')">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                        </svg>
-                    </button>
-                </div>
-            </div>
-
-            <div class="config-group">
-                <label class="config-label">Extra Headers</label>
-                <div class="input-group">
-                    <input type="text" class="config-input" value="" readonly placeholder="Не требуется">
-                    <button class="copy-btn" onclick="copyToClipboard('')">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                        </svg>
-                    </button>
-                </div>
-            </div>
-
-            <div class="config-group">
-                <label class="config-label">Image link</label>
-                <div class="input-group">
-                    <input type="text" class="config-input" value="{link}" readonly>
-                    <button class="copy-btn" onclick="copyToClipboard('{link}')">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                        </svg>
-                    </button>
-                </div>
-            </div>
-
-            <div class="config-group">
-                <label class="config-label">Deletion link</label>
-                <div class="input-group">
-                    <input type="text" class="config-input" value="{deletion_link}" readonly>
-                    <button class="copy-btn" onclick="copyToClipboard('{deletion_link}')">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                        </svg>
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <footer class="footer">
-            <a href="/" class="footer-link">Главная</a>
-        </footer>
     </div>
-
-    <div class="toast" id="toast">
-        <span>Скопировано</span>
-    </div>
-
-    <script src="/static/integrations.js"></script>
 </body>
 </html>

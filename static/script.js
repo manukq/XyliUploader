@@ -4,7 +4,7 @@ const uploadBtn = document.getElementById('uploadBtn');
 const historyBody = document.getElementById('historyBody');
 const toast = document.getElementById('toast');
 
-let selectedFile = null;
+let selectedFiles = [];
 
 function getCSRFToken() {
     const match = document.cookie.match(/(?:^|; )csrf_token=([^;]+)/);
@@ -25,12 +25,18 @@ async function checkAuth() {
         const response = await fetch('/auth/me');
         if (response.ok) {
             const data = await response.json();
-            document.getElementById('authButtons').style.display = 'none';
-            document.getElementById('userInfo').style.display = 'flex';
-            document.getElementById('username').textContent = data.username;
+            const loginBtn = document.getElementById('loginBtn');
+            const userInfo = document.getElementById('userInfo');
+            if (loginBtn) loginBtn.style.display = 'none';
+            if (userInfo) {
+                userInfo.style.display = 'flex';
+                document.getElementById('username').textContent = data.username;
+            }
         } else {
-            document.getElementById('authButtons').style.display = 'flex';
-            document.getElementById('userInfo').style.display = 'none';
+            const loginBtn = document.getElementById('loginBtn');
+            const userInfo = document.getElementById('userInfo');
+            if (loginBtn) loginBtn.style.display = 'flex';
+            if (userInfo) userInfo.style.display = 'none';
         }
     } catch (error) {
         console.error('Auth check failed:', error);
@@ -52,14 +58,13 @@ dropZone.addEventListener('drop', (e) => {
     e.preventDefault();
     dropZone.classList.remove('dragover');
 
-    const files = e.dataTransfer.files;
+    const files = Array.from(e.dataTransfer.files);
     if (files.length > 0) {
-        selectedFile = files[0];
+        selectedFiles = selectedFiles.concat(files);
         updateDropZoneText();
     }
 });
 
-// Paste image anywhere on page => upload
 document.addEventListener('paste', (e) => {
     const dt = e.clipboardData;
     if (!dt) return;
@@ -90,7 +95,7 @@ document.addEventListener('paste', (e) => {
 
     const ext = (file.type.split('/')[1] || 'png').toLowerCase();
     const safeName = `pasted-${Date.now()}.${ext}`;
-    selectedFile = new File([file], safeName, { type: file.type });
+    selectedFiles = [new File([file], safeName, { type: file.type })];
 
     updateDropZoneText();
 
@@ -99,34 +104,41 @@ document.addEventListener('paste', (e) => {
 
 fileInput.addEventListener('change', (e) => {
     if (e.target.files.length > 0) {
-        selectedFile = e.target.files[0];
+        selectedFiles = selectedFiles.concat(Array.from(e.target.files));
         updateDropZoneText();
     }
 });
 
 function updateDropZoneText() {
     const dropText = dropZone.querySelector('.drop-text');
-    if (selectedFile) {
-        dropText.textContent = selectedFile.name;
+    if (selectedFiles.length === 1) {
+        dropText.textContent = selectedFiles[0].name;
+    } else if (selectedFiles.length > 1) {
+        dropText.textContent = `${selectedFiles.length} файлов выбрано`;
     }
 }
 
 uploadBtn.addEventListener('click', async () => {
-    if (!selectedFile) {
+    if (selectedFiles.length === 0) {
         showToast('Выберите файл');
         return;
     }
 
-    if (selectedFile.size > 100 * 1024 * 1024) {
-        showToast('Файл слишком большой');
-        return;
+    const maxSize = 300 * 1024 * 1024;
+    for (const file of selectedFiles) {
+        if (file.size > maxSize) {
+            showToast('Файл слишком большой');
+            return;
+        }
     }
 
     uploadBtn.disabled = true;
     uploadBtn.textContent = 'Загрузка...';
 
     const formData = new FormData();
-    formData.append('file', selectedFile);
+    for (const file of selectedFiles) {
+        formData.append('file', file);
+    }
 
     try {
         const response = await fetch('/upload', {
@@ -137,15 +149,29 @@ uploadBtn.addEventListener('click', async () => {
 
         if (response.ok) {
             const data = await response.json();
-            saveToHistory(selectedFile.name, data.link, data.deletion_link);
+            for (const file of data.files) {
+                if (!file.error) {
+                    saveToHistory(file.filename, file.link, file.deletion_link);
+                }
+            }
             loadHistory();
 
-            selectedFile = null;
+            selectedFiles = [];
             fileInput.value = '';
             const dropText = dropZone.querySelector('.drop-text');
             dropText.textContent = 'Перетащите или выберите файл';
 
-            showToast('Файл загружен');
+            const successCount = data.files.filter(f => !f.error).length;
+            const errorCount = data.files.filter(f => f.error).length;
+
+            if (data.album_link) {
+                copyToClipboard(data.album_link);
+                showToast(`Альбом создан, ссылка скопирована`);
+            } else if (errorCount > 0) {
+                showToast(`Загружено ${successCount}, ошибок: ${errorCount}`);
+            } else {
+                showToast(`Загружено ${successCount} файлов`);
+            }
         } else {
             showToast('Ошибка загрузки');
         }
@@ -171,6 +197,40 @@ function saveToHistory(filename, url, deletionUrl) {
     }
 
     localStorage.setItem('uploadHistory', JSON.stringify(history));
+}
+
+async function createAlbum() {
+    const history = JSON.parse(localStorage.getItem('uploadHistory') || '[]');
+    const fileIDs = history.map(item => {
+        const match = item.url.match(/\/([^\/]+)$/);
+        return match ? match[1] : null;
+    }).filter(Boolean);
+
+    if (fileIDs.length === 0) {
+        showToast('Нет файлов для альбома');
+        return;
+    }
+
+    try {
+        const response = await fetch('/album/create', {
+            method: 'POST',
+            headers: {
+                ...csrfHeaders(),
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ file_ids: fileIDs })
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            copyToClipboard(data.link);
+            showToast('Альбом создана, ссылка скопирована');
+        } else {
+            showToast('Ошибка создания альбома');
+        }
+    } catch (error) {
+        showToast('Ошибка: ' + error.message);
+    }
 }
 
 function loadHistory() {
@@ -238,6 +298,57 @@ async function deleteFile(index, deletionUrl) {
         }
     } catch (error) {
         showToast('Ошибка: ' + error.message);
+    }
+}
+
+function copyAllLinks() {
+    const history = JSON.parse(localStorage.getItem('uploadHistory') || '[]');
+    if (history.length === 0) {
+        showToast('Нет ссылок');
+        return;
+    }
+
+    const links = history.map(item => item.url).join('\n');
+    copyToClipboard(links);
+    showToast(`Скопировано ${history.length} ссылок`);
+}
+
+async function deleteAllFiles() {
+    const history = JSON.parse(localStorage.getItem('uploadHistory') || '[]');
+    if (history.length === 0) {
+        showToast('Нет файлов');
+        return;
+    }
+
+    if (!confirm(`Удалить все файлы (${history.length})?`)) return;
+
+    let deleted = 0;
+    let errors = 0;
+
+    for (let i = history.length - 1; i >= 0; i--) {
+        try {
+            const response = await fetch(history[i].deletionUrl, {
+                method: 'POST',
+                headers: csrfHeaders()
+            });
+
+            if (response.ok) {
+                deleted++;
+            } else {
+                errors++;
+            }
+        } catch (error) {
+            errors++;
+        }
+    }
+
+    localStorage.removeItem('uploadHistory');
+    loadHistory();
+
+    if (errors > 0) {
+        showToast(`Удалено ${deleted}, ошибок: ${errors}`);
+    } else {
+        showToast(`Удалено ${deleted} файлов`);
     }
 }
 
